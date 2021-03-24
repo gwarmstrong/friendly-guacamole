@@ -1,5 +1,5 @@
 from unittest import TestCase
-from q2_anomaly_detection.datasets import (
+from friendly_guacamole.datasets import (
     Dataset,
     FileSystemArchiver,
     QiitaClient,
