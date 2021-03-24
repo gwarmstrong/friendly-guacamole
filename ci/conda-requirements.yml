@@ -1,0 +1,12 @@
+channels:
+  - conda-forge
+  - qiime2
+  - defaults
+  - bioconda
+dependencies:
+  - python
+  - scikit-bio>=0.24
+  - biom-format
+  - pandas
+  - numpy
+  - unifrac
