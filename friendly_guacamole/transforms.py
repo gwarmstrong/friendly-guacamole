@@ -96,19 +96,25 @@ class UniFrac(TransformerMixin):
             Transformed data
 
         """
-        dm = self._distance_backend(X)
+        sub_dm = self._get_distances(X)
+        return sub_dm
 
+    def _get_distances(self, X):
+        dm = self._get_distance_matrix(X)
+        sub_dm = self._extract_sub_matrix(X, dm)
+        return sub_dm
+
+    def _extract_sub_matrix(self, X, dm):
         # get indices of test ID's
         X_idx = [dm.index(name) for name in X.ids('sample')]
         # get indices of table ID's
         ref_idx = [dm.index(name) for name in self.table.ids('sample')]
-
         # extract sub-distance matrix
         idxs = np.ix_(X_idx, ref_idx)
         sub_dm = dm.data[idxs]
         return sub_dm
 
-    def _distance_backend(self, X):
+    def _get_distance_matrix(self, X):
         """
         computes UniFrac distances with the fitted samples
 
@@ -193,6 +199,8 @@ class RarefactionBIOM(TransformerMixin):
             rarefied table
 
         """
+        # TODO There is an unaccounted for  edge case here,
+        #  when samples have fewer counts than the depth
         X = X.filter(ids_to_keep=self.features, axis='observation',
                      inplace=False)
         index_ids = set(self.index.ids('sample'))
@@ -252,17 +260,17 @@ class Rarefaction(TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        """ rarefies a biom.Table
+        """ rarefies a feature table
         Caution: this will return different results for the same sample
 
         Parameters
         ----------
-        X : biom.Table
+        X : array-like
             feature table
 
         Returns
         -------
-        X_new : biom.Table
+        X_new : array-like
             rarefied table
 
         """
