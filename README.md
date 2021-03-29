@@ -13,11 +13,11 @@ from sklearn.decomposition import PCA
 
 dataset = KeyboardDataset('some/relative/path')
 
-pipeline = Pipeline(
+pipeline = Pipeline([
     ('convert_type', AsDense()),
     ('clr', CLR()),
     ('pca', PCA()),
-)
+])
 
 pipeline.fit_transform(dataset['table'])
 ```
