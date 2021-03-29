@@ -1,4 +1,4 @@
-# friendly-guacamole
+# friendly-guacamole :avocado:
 Microbiome-friendly scikit-learn style data preprocessing and other utilities
 
 friendly guacamole is designed to integrate common microbiome datatypes and 
