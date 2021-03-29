@@ -19,5 +19,5 @@ pipeline = Pipeline(
     ('pca', PCA()),
 )
 
-pipeline.fit_transform(dataset.table)
+pipeline.fit_transform(dataset['table'])
 ```
