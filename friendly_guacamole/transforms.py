@@ -139,6 +139,7 @@ class UniFrac(TransformerMixin):
 
             dm = ssu(f.name, self.tree_path,
                      unifrac_method='unweighted',
+                     variance_adjust=False,
                      alpha=1.0,
                      bypass_tips=False,
                      threads=1,

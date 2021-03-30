@@ -9,15 +9,22 @@ from friendly_guacamole.exceptions import DatasetError
 from http.client import HTTPResponse
 
 
-def download_and_extract_response(response, path):
-    os.makedirs(path, exist_ok=True)
-    zip_path = path + '.zip'
+def download_and_extract_response(response, path, unzip=True):
+    zip_path = path
+    if unzip:
+        os.makedirs(path, exist_ok=True)
+        zip_path = path + '.zip'
+    else:
+        pardir = os.path.abspath(os.path.join(os.curdir, os.pardir))
+        os.makedirs(pardir, exist_ok=True)
+
     with open(zip_path, 'wb') as fp:
         fp.write(response.read())
 
-    with ZipFile(zip_path, 'r') as fp:
-        fp.extractall(path)
-    os.remove(zip_path)
+    if unzip:
+        with ZipFile(zip_path, 'r') as fp:
+            fp.extractall(path)
+        os.remove(zip_path)
 
 
 class ArchiverMixin:
@@ -27,12 +34,12 @@ class ArchiverMixin:
 
 class QiitaSaveMixin(ArchiverMixin):
 
-    def _download_method(self, response, path):
-        download_and_extract_response(response, path)
+    def _download_method(self, response, path, unzip=True):
+        download_and_extract_response(response, path, unzip=unzip)
 
-    def save(self, artifact: 'Artifact', response: HTTPResponse):
+    def save(self, artifact: 'Artifact', response: HTTPResponse, unzip=True):
         path = os.path.join(self.dataset.path, artifact.name)
-        self._download_method(response, path)
+        self._download_method(response, path, unzip=unzip)
 
 
 class FileSystemArchiver(QiitaSaveMixin):
@@ -140,6 +147,40 @@ class ArtifactList(QiitaArtifact, FileSystemArtifact):
 class Tables(ArtifactList):
 
     name = 'table'
+
+
+class GenericWebArtifact(QiitaArtifact, FileSystemArtifact):
+
+    link: str
+
+    def __init__(self):
+        self.path = None
+
+    def qiita_download(self, client: 'QiitaClient', archiver: ArchiverMixin):
+        r = client.make_request(self.link)
+        archiver.save(self, r, unzip=False)
+
+    def filesystem_exists(self, archiver):
+        # being able to use path depends on datasets being checked for
+        # existence when the dataset is instantiated
+        self.path = self.filesystem_path(archiver)
+        return os.path.exists(self.path)
+
+    def filesystem_path(self, archiver):
+        path = os.path.join(
+            archiver.path, self.name
+        )
+        return os.path.abspath(path)
+
+
+class GG97OTUsTree(GenericWebArtifact):
+
+    name = '97_otus.tree'
+    link = 'ftp://greengenes.microbio.me/greengenes_release/gg_13_8_otus/'\
+           'trees/97_otus.tree'
+
+    def filesystem_read(self, archiver: FileSystemArchiver):
+        return self
 
 
 class Metadata(QiitaArtifact, FileSystemArtifact):
@@ -253,6 +294,7 @@ class KeyboardDataset(Dataset):
     artifacts = {
         'metadata': Metadata(study_id),
         'table': Table(table_artifact_id),
+        'tree': GG97OTUsTree(),
     }
 
 
@@ -266,4 +308,5 @@ class DietInterventionStudy(Dataset):
             Table(table_artifact_ids[0]),
             Table(table_artifact_ids[1]),
         ),
+        'tree': GG97OTUsTree(),
     }
