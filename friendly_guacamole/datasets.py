@@ -15,7 +15,7 @@ def download_and_extract_response(response, path, unzip=True):
         os.makedirs(path, exist_ok=True)
         zip_path = path + '.zip'
     else:
-        pardir = os.path.abspath(os.path.join(os.curdir, os.pardir))
+        pardir = os.path.abspath(os.path.join(path, os.pardir))
         os.makedirs(pardir, exist_ok=True)
 
     with open(zip_path, 'wb') as fp:
