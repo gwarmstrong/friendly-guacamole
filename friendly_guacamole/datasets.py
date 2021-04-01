@@ -1,10 +1,14 @@
 from typing import Dict, Callable
+from pathlib import Path
 from abc import ABC
 from urllib import request
+from io import BytesIO
 from zipfile import ZipFile
+import h5py
 import os
 import pandas as pd
 from biom import load_table
+from biom.util import biom_open
 from friendly_guacamole.exceptions import DatasetError
 from http.client import HTTPResponse
 
@@ -241,6 +245,151 @@ class QiitaClient:
         return request.urlopen(url)
 
 
+class NewDataset(ABC):
+
+    artifacts: Dict[str, Artifact] = dict()
+
+    def __init__(self, path, download=True):
+        self.path = path
+
+        if download:
+            self.download()
+
+        if not self._check_integrity():
+            raise DatasetError('Dataset not found or corrupted.' +
+                               ' You can use download=True to download it')
+
+        self._data = {}
+
+    def download(self):
+        if self._check_integrity():
+            print('Files already downloaded and verified')
+            return
+        for artifact in self.artifacts.values():
+            artifact.download(self.path)
+
+    def _check_integrity(self):
+        return all(
+            artifact.exists(self.path) for artifact in
+            self.artifacts.values()
+        )
+
+    def __getitem__(self, item):
+        if item in self._data:
+            return self._data[item]
+        elif item in self.artifacts:
+            value = self.artifacts[item].read(self.path)
+            self._data[item] = value
+            return value
+        else:
+            raise KeyError(item)
+
+
+class ArtifactInterface:
+
+    def download(self, path):
+        data = self.client.download()
+        self.archiver.save(data, path)
+        return data
+
+    def read(self, path):
+        data = self.archiver.read(path)
+        return data
+
+    def exists(self, path):
+        return self.archiver.exists(path)
+
+
+class QiitaClientInterface:
+    _artifact_fstring = "https://qiita.ucsd.edu/public_artifact_download/" \
+                        "?artifact_id={}"
+    _metadata_fstring = "https://qiita.ucsd.edu/public_download/" \
+                        "?data=sample_information&study_id={}"
+
+    @staticmethod
+    def make_request(url):
+        return request.urlopen(url)
+
+    def get_data(self):
+        link = self.get_link()
+        zipdata = BytesIO()
+        zipdata.write(self.make_request(link).read())
+        myzipfile = ZipFile(zipdata)
+        return myzipfile
+
+    def download(self):
+        data = self.get_data()
+        return self.scavenge_data(data)
+
+
+class QiitaArtifactClientInterface(QiitaClientInterface):
+    _artifact_fstring = "https://qiita.ucsd.edu/public_artifact_download/" \
+                        "?artifact_id={}"
+
+    def __init__(self, artifact_id):
+        self.artifact_id = artifact_id
+
+    def get_link(self):
+        artifact_link = self._artifact_fstring.format(self.artifact_id)
+        return artifact_link
+
+
+class QiitaTableClient(QiitaArtifactClientInterface):
+
+    def scavenge_data(self, data):
+        path_to_table = os.path.join(
+            'BIOM',
+            str(self.artifact_id),
+            'otu_table.biom',
+        )
+        return load_table(h5py.File(data.open(path_to_table)))
+
+
+class ArchiverInterface:
+
+    def save(self, data, path):
+        raise NotImplemented()
+
+    def read(self, path):
+        raise NotImplemented()
+
+    def exists(self, path):
+        raise NotImplemented()
+
+
+class BIOMArchiver(ArchiverInterface):
+
+    def __init__(self, identifier):
+        self.identifier = str(identifier)
+
+    def path(self, root):
+        pardir = os.path.join(root, self.identifier, 'table')
+        path = os.path.join(pardir, self.identifier +
+                            '.table.biom')
+        return path
+
+    def exists(self, root):
+        return os.path.exists(self.path(root))
+
+    def read(self, root):
+        path = self.path(root)
+        return load_table(path)
+
+    def save(self, data, root):
+        path = self.path(root)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+
+        with biom_open(path, 'w') as fh:
+            data.to_hdf5(fh, self.identifier)
+
+
+class QiitaTable(ArtifactInterface):
+
+    def __init__(self, artifact_id):
+        self.archiver = BIOMArchiver(artifact_id)
+        self.client = QiitaTableClient(artifact_id)
+
+
 class Dataset(ABC):
 
     artifacts: Dict[str, Artifact] = dict()
@@ -295,6 +444,15 @@ class KeyboardDataset(Dataset):
         'metadata': Metadata(study_id),
         'table': Table(table_artifact_id),
         'tree': GG97OTUsTree(),
+    }
+
+
+class NewKeyboardDataset(NewDataset):
+    study_id = 232
+    table_artifact_id = 46809
+
+    artifacts = {
+        'table': QiitaTable(table_artifact_id),
     }
 
 
