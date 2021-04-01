@@ -348,13 +348,13 @@ class QiitaTableClient(QiitaArtifactClientInterface):
 class ArchiverInterface:
 
     def save(self, data, path):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def read(self, path):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def exists(self, path):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class BIOMArchiver(ArchiverInterface):
