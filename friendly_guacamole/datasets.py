@@ -1,4 +1,4 @@
-from typing import Dict, Callable
+from typing import Dict
 from tempfile import NamedTemporaryFile
 from pathlib import Path
 from abc import ABC
@@ -11,7 +11,6 @@ import pandas as pd
 from biom import load_table
 from biom.util import biom_open
 from friendly_guacamole.exceptions import DatasetError
-from http.client import HTTPResponse
 
 
 class Dataset(ABC):
@@ -156,7 +155,8 @@ class QiitaMetadataClient(QiitaClientInterface):
         path_to_metadata = 'templates'
         md_candidates = list(
             filter(
-                lambda n: n.startswith(path_to_metadata) and n.endswith('.txt'),
+                lambda n: n.startswith(
+                    path_to_metadata) and n.endswith('.txt'),
                 data.namelist()
             ))
         if len(md_candidates) == 0:
@@ -316,7 +316,6 @@ class MetadataList(ArtifactInterface):
 
 
 class GreenGenes97Tree(ArtifactInterface):
-
     link = 'ftp://greengenes.microbio.me/greengenes_release/gg_13_8_otus/' \
            'trees/97_otus.tree'
 
@@ -357,7 +356,6 @@ class DietInterventionStudy(Dataset):
 
 
 class HMPV13V35(Dataset):
-
     study_ids = [1927, 1928]
     table_artifact_ids = [47414, 47420]
 
