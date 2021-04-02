@@ -4,6 +4,7 @@ from sklearn.base import TransformerMixin
 from biom.util import biom_open
 from skbio.stats.composition import clr
 from skbio.stats import subsample_counts
+from skbio.stats.ordination import pcoa
 from friendly_guacamole.utils import as_dense
 import pandas as pd
 from unifrac import ssu
@@ -350,3 +351,103 @@ class CLR(TransformerMixin):
 
         """
         return clr(X + self.pseudocount)
+
+
+class PCoA(TransformerMixin):
+    def __init__(self, metric='precomputed'):
+        """Performas a PCoA on the data
+
+        Parameters
+        ----------
+        metric : str, default='precomputed'
+            metric to compute PCoA on. If 'precomputed', a distance matrix is
+            expected
+
+        """
+        self.metric = metric
+        self.embedding_ = None
+
+    def fit(self, X, y=None):
+        """
+
+        Parameters
+        ----------
+        X : array-like
+            Feature table or distance matrix
+        y : None
+            ignored
+
+        Returns
+        -------
+        self
+            fitted pcoa
+
+        """
+        if self.metric == 'precomputed':
+            self.embedding_ = pcoa(X).samples
+        else:
+            raise NotImplementedError()
+        return self
+
+    def fit_transform(self, X, y=None):
+        """
+
+        Parameters
+        ----------
+        X : array-like
+            Feature table or distance matrix
+
+        Returns
+        -------
+        array-like
+            embeddings of the samples
+        """
+        self.fit(X, y)
+        return self.embedding_
+
+
+class FilterSamples(TransformerMixin):
+
+    def __init__(self, min_count=0):
+        """
+        Filters samples
+
+        Parameters
+        ----------
+        min_count : int
+            Minimum number of feature counts neede dto retain sample
+
+        """
+        self.min_count = min_count
+
+    def fit(self, X, y=None):
+        """
+
+        Parameters
+        ----------
+        X : biom.Table
+
+        Returns
+        -------
+        self
+            fitted transformer
+
+        """
+        return self
+
+    def transform(self, X, y=None):
+        """
+        Parameters
+        ----------
+        X : biom.Table
+
+        Returns
+        -------
+        biom.Table
+            The filtered table.
+
+        """
+        sample_counts = X.sum(axis='sample')
+        insufficient_counts = (sample_counts < self.min_count)
+        ids_to_remove = set(X.ids('sample')[insufficient_counts])
+        return X.filter(ids_to_remove, invert=True, inplace=False)
