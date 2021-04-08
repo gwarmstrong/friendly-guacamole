@@ -3,6 +3,7 @@ from tempfile import NamedTemporaryFile
 from pathlib import Path
 from abc import ABC
 from urllib import request
+import requests
 from io import BytesIO
 from zipfile import ZipFile
 import h5py
@@ -88,12 +89,14 @@ class QiitaClientInterface(ClientInterface):
 
     @staticmethod
     def make_request(url):
-        return request.urlopen(url)
+        return requests.get(url)
 
     def get_data(self):
         link = self.get_link()
         zipdata = BytesIO()
-        zipdata.write(self.make_request(link).read())
+        requested = self.make_request(link)
+        request_data = requested.content
+        zipdata.write(request_data)
         myzipfile = ZipFile(zipdata)
         return myzipfile
 

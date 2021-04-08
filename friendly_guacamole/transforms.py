@@ -59,11 +59,14 @@ class UniFrac(TransformerMixin):
     ----------
     tree_path : string
         Path to a phylogeny containing all IDs in the candidate tables
+    unifrac_method : string
+        UniFrac method to use. See `unifrac` package.
 
     """
 
-    def __init__(self, tree_path):
+    def __init__(self, tree_path, unifrac_method='unweighted'):
         self.tree_path = tree_path
+        self.unifrac_method = unifrac_method
         self.table = None
 
     def fit(self, X, y=None):
@@ -139,7 +142,7 @@ class UniFrac(TransformerMixin):
                 merged_table.to_hdf5(b, "merged")
 
             dm = ssu(f.name, self.tree_path,
-                     unifrac_method='unweighted',
+                     unifrac_method=self.unifrac_method,
                      variance_adjust=False,
                      alpha=1.0,
                      bypass_tips=False,
