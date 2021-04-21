@@ -353,7 +353,11 @@ class CLR(TransformerMixin):
             Transformed data
 
         """
-        return clr(X + self.pseudocount)
+        transfored_data = clr(X + self.pseudocount)
+        if X.shape[0] == 1:
+            transfored_data = transfored_data.reshape(1, -1)
+
+        return transfored_data
 
 
 class PCoA(TransformerMixin):
