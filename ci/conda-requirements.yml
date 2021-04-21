@@ -10,4 +10,5 @@ dependencies:
   - biom-format
   - pandas
   - numpy
+  - h5py>=3.0
   - unifrac
