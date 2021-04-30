@@ -1,5 +1,6 @@
 import tempfile
 import numpy as np
+from scipy.spatial.distance import cdist
 from sklearn.base import TransformerMixin
 from biom.util import biom_open
 from skbio.stats.composition import clr
@@ -373,6 +374,7 @@ class PCoA(TransformerMixin):
         """
         self.metric = metric
         self.embedding_ = None
+        self.ordination_ = None
 
     def fit(self, X, y=None):
         """
@@ -390,10 +392,15 @@ class PCoA(TransformerMixin):
             fitted pcoa
 
         """
-        if self.metric == 'precomputed':
-            self.embedding_ = pcoa(X).samples
-        else:
-            raise NotImplementedError()
+        X_to_ordinate = X
+        if self.metric != 'precomputed':
+            X_to_ordinate = cdist(X_to_ordinate, X_to_ordinate,
+                                  metric=self.metric,
+                                  )
+
+        self.ordination_ = pcoa(X_to_ordinate)
+        self.embedding_ = self.ordination_.samples
+
         return self
 
     def fit_transform(self, X, y=None):
