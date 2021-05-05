@@ -1,13 +1,15 @@
 import tempfile
+from contextlib import contextmanager
 import numpy as np
 from sklearn.base import TransformerMixin
+from scipy.spatial.distance import cdist
 from biom.util import biom_open
 from skbio.stats.composition import clr
 from skbio.stats import subsample_counts
 from skbio.stats.ordination import pcoa
 from friendly_guacamole.utils import as_dense
 import pandas as pd
-from unifrac import ssu
+from unifrac import ssu, faith_pd
 
 
 class AsDense(TransformerMixin):
@@ -51,23 +53,7 @@ class AsDense(TransformerMixin):
         return as_dense(X)
 
 
-class UniFrac(TransformerMixin):
-    """
-    computes the UniFrac distance on a biom.Table
-
-    Parameters
-    ----------
-    tree_path : string
-        Path to a phylogeny containing all IDs in the candidate tables
-    unifrac_method : string
-        UniFrac method to use. See `unifrac` package.
-
-    """
-
-    def __init__(self, tree_path, unifrac_method='unweighted'):
-        self.tree_path = tree_path
-        self.unifrac_method = unifrac_method
-        self.table = None
+class _unifracMixin:
 
     def fit(self, X, y=None):
         """
@@ -85,6 +71,32 @@ class UniFrac(TransformerMixin):
         """
         self.table = X
         return self
+
+    @contextmanager
+    def hdf5_table(self, X):
+        with tempfile.NamedTemporaryFile() as f:
+            with biom_open(f.name, 'w') as b:
+                X.to_hdf5(b, "merged")
+                yield f
+
+
+class UniFrac(TransformerMixin, _unifracMixin):
+    """
+    computes the UniFrac distance on a biom.Table
+
+    Parameters
+    ----------
+    tree_path : string
+        Path to a phylogeny containing all IDs in the candidate tables
+    unifrac_method : string
+        UniFrac method to use. See `unifrac` package.
+
+    """
+
+    def __init__(self, tree_path, unifrac_method='unweighted'):
+        self.tree_path = tree_path
+        self.unifrac_method = unifrac_method
+        self.table = None
 
     def transform(self, X):
         """
@@ -137,10 +149,7 @@ class UniFrac(TransformerMixin):
         #  if any samples in X overlap self.table, the counts will
         #  be doubled
         merged_table = self.table.merge(X)
-        with tempfile.NamedTemporaryFile() as f:
-            with biom_open(f.name, 'w') as b:
-                merged_table.to_hdf5(b, "merged")
-
+        with self.hdf5_table(merged_table) as f:
             dm = ssu(f.name, self.tree_path,
                      unifrac_method=self.unifrac_method,
                      variance_adjust=False,
@@ -149,6 +158,20 @@ class UniFrac(TransformerMixin):
                      threads=1,
                      )
         return dm
+
+
+class FaithPD(TransformerMixin, _unifracMixin):
+
+    def __init__(self, tree_path):
+        self.tree_path = tree_path
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        with self.hdf5_table(X) as f:
+            fpd = faith_pd(f.name, self.tree_path)
+        return fpd.to_frame()
 
 
 class RarefactionBIOM(TransformerMixin):
@@ -373,6 +396,7 @@ class PCoA(TransformerMixin):
         """
         self.metric = metric
         self.embedding_ = None
+        self.ordination_results_ = None
 
     def fit(self, X, y=None):
         """
@@ -390,10 +414,13 @@ class PCoA(TransformerMixin):
             fitted pcoa
 
         """
-        if self.metric == 'precomputed':
-            self.embedding_ = pcoa(X).samples
-        else:
-            raise NotImplementedError()
+        # TODO validation on X
+        if self.metric != 'precomputed':
+            X = cdist(X, X, metric=self.metric)
+
+        self.ordination_results_ = pcoa(X)
+        self.embedding_ = self.ordination_results_.samples
+
         return self
 
     def fit_transform(self, X, y=None):
