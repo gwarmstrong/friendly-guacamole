@@ -347,6 +347,17 @@ class KeyboardDataset(Dataset):
     }
 
 
+class SoilsDataset(Dataset):
+    study_id = 103
+    table_artifact_id = 44763
+
+    artifacts = {
+        'table': QiitaTable(table_artifact_id),
+        'metadata': QiitaMetadata(study_id),
+        'tree': GreenGenes97Tree(),
+    }
+
+
 class DietInterventionStudy(Dataset):
     study_id = 11550
     table_artifact_ids = [63512, 63515]
